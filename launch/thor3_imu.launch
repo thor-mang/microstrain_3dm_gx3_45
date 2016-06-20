@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="microstrain_3dm_gx3_45" name="imu_3dm_node" type="imu_driver" output="screen">
+    <param name="rate" value="100.0"/>
+    <param name="frame_id" value="pelvis_link"/>
+ <!--   <param name="linear_acceleration_stdev" value="0.25"/>
+    <param name="orientation_stdev" value="0.5"/> 
+    <param name="angular_velocity_stdev" value="0.5"/>  -->
+     <remap from="~imu/data"    to="sensor/imu/raw"/>
+     <!--<remap from="imu/filter" to="sensor/imu/filtered"/> -->
+  </node>
+  
+  <node pkg="topic_tools" name="imu_filtered_republish" type="relay" args="sensor/imu/raw sensor/imu/filtered" />
+
+</launch>

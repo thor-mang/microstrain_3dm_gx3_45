@@ -293,7 +293,7 @@ void imuNode::spin() {
 
 			tnav n = imu_->getNAV();
 
-			nav_pose.header.stamp.fromNSec(n.time);
+      nav_pose.header.stamp = ros::Time::now();
 
 			float yaw = n.est_y;
 
@@ -312,7 +312,7 @@ void imuNode::spin() {
 
 			tnav n = imu_->getNAV();
 
-			nav_odom.header.stamp.fromNSec(n.time);
+      nav_odom.header.stamp = ros::Time::now();
 			
 			if (n.est_latitude != 0 && n.est_longtitude != 0) {
 
@@ -396,16 +396,16 @@ void imuNode::spin() {
             } else {
 
             	nav_odom.twist.covariance[0] = 99999;
-				nav_odom.twist.covariance[7] = 99999;
-				nav_odom.twist.covariance[14] = 99999;
+              nav_odom.twist.covariance[7] = 99999;
+              nav_odom.twist.covariance[14] = 99999;
 
             }
 
             if (n.est_acc_rot_valid) {
 
-				nav_odom.twist.covariance[21] = angular_velocity_covariance;
-				nav_odom.twist.covariance[28] = angular_velocity_covariance;
-				nav_odom.twist.covariance[35] = angular_velocity_covariance;
+              nav_odom.twist.covariance[21] = angular_velocity_covariance;
+              nav_odom.twist.covariance[28] = angular_velocity_covariance;
+              nav_odom.twist.covariance[35] = angular_velocity_covariance;
 
 			} else {
 
@@ -427,23 +427,30 @@ void imuNode::spin() {
 
 			tahrs q = imu_->getAHRS();
 
-			imu.header.stamp.fromNSec(q.time);
+      imu.header.stamp = ros::Time::now();
 
-			imu.linear_acceleration.x = -q.ax;
-			imu.linear_acceleration.y = q.ay;
-			imu.linear_acceleration.z = -q.az;
+      imu.linear_acceleration.x = q.ax;
+      imu.linear_acceleration.y = q.ay;
+      imu.linear_acceleration.z = q.az;
 
-			imu.angular_velocity.x = -q.gx;
-			imu.angular_velocity.y = q.gy;
-			imu.angular_velocity.z = -q.gz;
+      imu.angular_velocity.x = q.gx;
+      imu.angular_velocity.y = q.gy;
+      imu.angular_velocity.z = q.gz;
 
-			float yaw = q.y;
+      // TODO MAKE CONFIGURABLE
+      // IMU is mounted upside down.
+      tf::Quaternion rotX = tf::createQuaternionFromRPY(M_PI, 0, 0);
+      tf::Quaternion rotZ = tf::createQuaternionFromRPY(0, 0, M_PI);
 
-            // TODO is this needed?
-			yaw+=M_PIl;
-			if (yaw > M_PIl) yaw-=2*M_PIl;
+      tf::Quaternion quat(q.q[1], q.q[2], q.q[3], q.q[0]);
 
-			tf::quaternionTFToMsg(tf::createQuaternionFromRPY(-q.r, q.p, -yaw), imu.orientation);
+      tf::Quaternion quat_rotated = rotZ * rotX * quat;
+
+      // write to message
+      imu.orientation.w =  quat_rotated.w();
+      imu.orientation.x =  quat_rotated.x();
+      imu.orientation.y =  quat_rotated.y();
+      imu.orientation.z =  quat_rotated.z();
 
 			imu_data_pub_.publish(imu);
 
@@ -455,14 +462,22 @@ void imuNode::spin() {
 
 			tahrs q = imu_->getAHRS();
 
-			//ps.header.stamp.fromBoost(q.time);
-			ps.header.stamp.fromNSec(q.time);
+      ps.header.stamp = ros::Time::now();
 
-			float yaw = q.y;
-			yaw+=M_PIl;
-			if (yaw > M_PIl) yaw-=2*M_PIl;
+      // TODO MAKE CONFIGURABLE
+      // IMU is mounted upside down.
+      tf::Quaternion rotX = tf::createQuaternionFromRPY(M_PI, 0, 0);
+      tf::Quaternion rotZ = tf::createQuaternionFromRPY(0, 0, M_PI);
 
-			tf::quaternionTFToMsg(tf::createQuaternionFromRPY(-q.r, q.p, -yaw),ps.pose.orientation);
+      tf::Quaternion quat(q.q[1], q.q[2], q.q[3], q.q[0]);
+
+      tf::Quaternion quat_rotated = rotZ * rotX * quat;
+
+      // write to message
+      ps.pose.orientation.w =  quat_rotated.w();
+      ps.pose.orientation.x =  quat_rotated.x();
+      ps.pose.orientation.y =  quat_rotated.y();
+      ps.pose.orientation.z =  quat_rotated.z();
 
 			imu_pose_pub_.publish(ps);
 
@@ -518,7 +533,7 @@ void imuNode::spin() {
 
 			tnav n = imu_->getNAV();
 
-			nav_fix.header.stamp.fromNSec(n.time);
+      nav_fix.header.stamp = ros::Time::now();
 
 			nav_fix.latitude = n.est_latitude;
 			nav_fix.longitude = n.est_longtitude;
@@ -552,7 +567,7 @@ void imuNode::spin() {
 			tgps g;
 			g = imu_->getGPS();
 
-			gps.header.stamp.fromNSec(g.time);
+      gps.header.stamp = ros::Time::now();
 
 			gps.latitude = g.latitude;
 			gps.longitude = g.longtitude;
@@ -584,7 +599,7 @@ void imuNode::spin() {
 			tgps g;
 			g = imu_->getGPS();
 
-			gps_odom.header.stamp.fromNSec(g.time);
+      gps_odom.header.stamp = ros::Time::now();
 
 			if (g.lat_lon_valid) {
 

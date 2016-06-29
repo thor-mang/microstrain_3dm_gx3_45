@@ -42,6 +42,8 @@ namespace microstrain_3dm_gx3_45 {
 		float p;
 		float y;
 
+    float q[4];
+
 		uint64_t time;
 
 	} tahrs;

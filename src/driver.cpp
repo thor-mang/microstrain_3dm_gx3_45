@@ -4,6 +4,8 @@
 #include <iostream>
 #include <boost/bind.hpp>
 
+#include <iomanip>
+
 using namespace microstrain_3dm_gx3_45;
 using namespace std;
 using namespace boost;
@@ -488,7 +490,7 @@ bool IMU::pollAHRS() {
 
 	tbyte_array recv;
 
-	size_t n = 46; // TODO this is really stupid... there must be some parsing etc....
+  size_t n = 50; // TODO this is really stupid... there must be some parsing etc....
 
 	struct timespec curtime;
 	clock_gettime(CLOCK_REALTIME, &curtime);
@@ -496,12 +498,6 @@ bool IMU::pollAHRS() {
 	recv = read(n);
 
 	if (!crcCheck(recv)) return false;
-
-	//if (!checkACK(recv,CMD_SET_3DM,CMD_3DM_POLL_AHRS)) return false;
-
-	// quaternion 0x0A, field length 18, MSB first
-
-	//quat.time = posix_time::microsec_clock::local_time();
 
 	if (recv[2] != 0x0E || recv[3] != 0x04) {
 
@@ -512,6 +508,7 @@ bool IMU::pollAHRS() {
 
 	ahrs_data_.time =  (uint64_t)(curtime.tv_sec) * 1000000000 + (uint64_t)(curtime.tv_nsec);
 
+  // accelerometer
 	ahrs_data_.ax = extractFloat(&recv[4]); // 0x04
 	ahrs_data_.ay = extractFloat(&recv[4+4]);
 	ahrs_data_.az = extractFloat(&recv[4+8]);
@@ -523,25 +520,29 @@ bool IMU::pollAHRS() {
 
 	}
 
+  // gyro
 	ahrs_data_.gx = extractFloat(&recv[18]); // 0x05
 	ahrs_data_.gy = extractFloat(&recv[18+4]);
 	ahrs_data_.gz = extractFloat(&recv[18+8]);
 
-	if (recv[30] != 0x0E || recv[31] != 0x0C) {
+  if (recv[30] != 0x12 || recv[31] != 0x0A) {
 
-		errMsg("AHRS: Wrong msg format (0x0C).");
+    errMsg("AHRS: Wrong msg format (0x0A).");
+    std::cerr << "Received: " << (int)recv[30] << ", " << (int)recv[31] << std::endl;
 		return false;
 
 	}
 
-	ahrs_data_.r = extractFloat(&recv[32]); // 0x0C
-	ahrs_data_.p = extractFloat(&recv[32+4]);
-	ahrs_data_.y = extractFloat(&recv[32+8]);
+  // euler angles
+//	ahrs_data_.r = extractFloat(&recv[32]); // 0x0C
+//	ahrs_data_.p = extractFloat(&recv[32+4]);
+//	ahrs_data_.y = extractFloat(&recv[32+8]);
 
-	/*quat.q0 = extractFloat(&recv[6]);
-	quat.q1 = extractFloat(&recv[6+4]);
-	quat.q2 = extractFloat(&recv[6+8]);
-	quat.q3 = extractFloat(&recv[6+12]);*/
+  // quaternion // 0x0A
+  ahrs_data_.q[0] = extractFloat(&recv[32]);    // w
+  ahrs_data_.q[1] = extractFloat(&recv[32+4]);  // x
+  ahrs_data_.q[2] = extractFloat(&recv[32+8]);  // y
+  ahrs_data_.q[3] = extractFloat(&recv[32+12]); // z
 
 	//cout << quat.q0 << " " << quat.q1 << " " << quat.q2 << " " << quat.q3 << endl;
 
@@ -707,23 +708,28 @@ bool IMU::setAHRSMsgFormat() {
 	data.push_back(sync2);
 	data.push_back(CMD_SET_3DM); // desc set
 	data.push_back(0x0D); // length
-	data.push_back(0x0D);
-	data.push_back(CMD_3DM_AHRS_MSG_FORMAT);
+  data.push_back(0x0D); // field length
+  data.push_back(CMD_3DM_AHRS_MSG_FORMAT); // field desc
 
-	data.push_back(FUN_USE_NEW);
+  // field data
+  data.push_back(FUN_USE_NEW); // function
 	data.push_back(0x03); // desc count
 
+  // 1st descriptor
 	data.push_back(0x04); // accelerometer vector
-	data.push_back(0x0);
-	data.push_back(100/rate_); // 20 Hz
+  data.push_back(0x0); // first byte rate decimation
+  data.push_back(100/rate_); // rate decimation
 
+  // 2nd descriptor
 	data.push_back(0x05); // gyro vector
-	data.push_back(0x0);
-	data.push_back(100/rate_); // 20 Hz
+  data.push_back(0x0);
+  data.push_back(100/rate_); // rate decimation
 
-	data.push_back(0x0C); // euler angles
+  // 3rd descriptor
+//	data.push_back(0x0C); // euler angles
+  data.push_back(0x0A); // quaternion
 	data.push_back(0x0);
-	data.push_back(100/rate_); // rate decimation -> 20 Hz
+  data.push_back(100/rate_); // rate decimation
 
 	crc(data);
 	write(data);
@@ -1050,7 +1056,7 @@ bool IMU::crcCheck(tbyte_array& arr) {
 
 	if ( ((uint8_t)arr[1]+4) != (uint8_t)arr.size() ) {
 
-		cout << "Sizes mismatch." << endl;
+    std::cout << "Packet sizes mismatch! Expected: " << (uint8_t)arr[1]+4 << ", received: " << arr.size() << std::endl;
 
 	}
 
